@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Rust Chart",
+  "version": "0.1.0",
+  "identifier": "com.antigravity.rust-chart",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Rust Trading Chart",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "shell": {
+      "allow": [
+        {
+          "name": "open",
+          "cmd": "open",
+          "args": true
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}
