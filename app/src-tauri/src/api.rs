@@ -1,5 +1,7 @@
+use tauri::State;
 use crate::models::{KlineData, KlineWithIndicator};
-use crate::indicators::calculate_sma;
+use crate::indicators::{calculate_sma, calculate_bollinger_bands};
+use crate::state::AppState;
 
 /// 過去のローソク足データを Binance API から取得し、指標を計算して返す
 ///
@@ -7,7 +9,18 @@ use crate::indicators::calculate_sma;
 /// - `Ok(Vec<KlineWithIndicator>)`: 取得に成功した場合、ローソク足データと指標のリストを返します。
 /// - `Err(String)`: HTTPリクエストやパースに失敗した場合、エラーメッセージを返します。
 #[tauri::command]
-pub async fn fetch_candles() -> Result<Vec<KlineWithIndicator>, String> {
+pub async fn fetch_candles(
+    state: State<'_, AppState>,
+    period: usize,
+    multiplier: f64,
+) -> Result<Vec<KlineWithIndicator>, String> {
+    // 設定を更新
+    {
+        let mut config = state.config.lock().map_err(|_| "Failed to lock config".to_string())?;
+        config.period = period;
+        config.multiplier = multiplier;
+    }
+
     // HTTPクライアントの生成
     let client = reqwest::Client::new();
     
@@ -51,12 +64,25 @@ pub async fn fetch_candles() -> Result<Vec<KlineWithIndicator>, String> {
         }
     }
 
-    // SMA (20期間) を計算
-    let sma_values = calculate_sma(&klines, 20);
+    // 共有ステートを更新 (Mutexロックを取得)
+    {
+        let mut state_klines = state.klines.lock().map_err(|_| "Failed to lock state".to_string())?;
+        *state_klines = klines.clone();
+    }
+
+    // SMA を計算
+    let sma_values = calculate_sma(&klines, period);
+    // ボリンジャーバンド を計算
+    let (upper_band, lower_band) = calculate_bollinger_bands(&klines, period, multiplier);
 
     // データを結合
-    let combined = klines.into_iter().zip(sma_values.into_iter())
-        .map(|(kline, sma)| KlineWithIndicator { kline, sma })
+    let combined = klines.into_iter().enumerate()
+        .map(|(i, kline)| KlineWithIndicator {
+            kline,
+            sma: sma_values[i],
+            upper_band: upper_band[i],
+            lower_band: lower_band[i],
+        })
         .collect();
 
     Ok(combined)

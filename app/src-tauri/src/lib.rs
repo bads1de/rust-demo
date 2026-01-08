@@ -3,3 +3,4 @@ pub mod api;
 pub mod indicators;
 pub mod models;
 pub mod websocket;
+pub mod state;

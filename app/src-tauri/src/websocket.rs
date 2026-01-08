@@ -1,8 +1,10 @@
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use futures_util::StreamExt;
 use tokio_tungstenite::connect_async;
 use url::Url;
-use crate::models::KlineMessage;
+use crate::models::{KlineMessage, KlineWithIndicator};
+use crate::state::AppState;
+use crate::indicators::{calculate_sma, calculate_bollinger_bands};
 
 /// WebSocket接続を管理し、データを受信してフロントエンドに送信するタスク
 pub async fn start_websocket_listener(app_handle: AppHandle) {
@@ -30,8 +32,56 @@ pub async fn start_websocket_listener(app_handle: AppHandle) {
                     // JSONパース
                     match serde_json::from_str::<KlineMessage>(text) {
                         Ok(parsed) => {
-                            // フロントエンドにイベントを発行
-                            let _ = app_handle.emit("kline-update", parsed.kline);
+                            let new_kline = parsed.kline;
+                            let state = app_handle.state::<AppState>();
+                            
+                            // 共有データをロックして更新
+                            let (sma, upper, lower) = {
+                                let mut klines = state.klines.lock().unwrap();
+                                
+                                // データが空なら何もしない (fetch_candlesがまだ)
+                                if klines.is_empty() {
+                                    (None, None, None)
+                                } else {
+                                    // 最新データのタイムスタンプを確認
+                                    let last_idx = klines.len() - 1;
+                                    if klines[last_idx].time == new_kline.time {
+                                        // 同じ足の更新: 上書き
+                                        klines[last_idx] = new_kline.clone();
+                                    } else if klines[last_idx].time < new_kline.time {
+                                        // 新しい足: 追加
+                                        klines.push(new_kline.clone());
+                                        // 履歴が長すぎたら古いものを削除 (メモリ節約)
+                                        if klines.len() > 2000 {
+                                            klines.remove(0);
+                                        }
+                                    }
+
+                                    // 現在の設定を取得
+                                    let config = state.config.lock().unwrap();
+                                    let period = config.period;
+                                    let multiplier = config.multiplier;
+
+                                    // 指標を再計算
+                                    let sma_values = calculate_sma(&klines, period);
+                                    let (u_bands, l_bands) = calculate_bollinger_bands(&klines, period, multiplier);
+                                    
+                                    // 最新の計算結果を取得
+                                    let current_idx = klines.len() - 1;
+                                    (sma_values[current_idx], u_bands[current_idx], l_bands[current_idx])
+                                }
+                            };
+
+                            // フロントエンドに送信するデータを作成
+                            let update_data = KlineWithIndicator {
+                                kline: new_kline,
+                                sma,
+                                upper_band: upper,
+                                lower_band: lower,
+                            };
+
+                            // イベント発行
+                            let _ = app_handle.emit("kline-update", update_data);
                         }
                         Err(e) => {
                             eprintln!("Failed to parse message: {}", e);

@@ -41,6 +41,10 @@ pub struct KlineWithIndicator {
     pub kline: KlineData,
     /// 移動平均線 (Simple Moving Average)
     pub sma: Option<f64>,
+    /// ボリンジャーバンド上部バンド (+2σ)
+    pub upper_band: Option<f64>,
+    /// ボリンジャーバンド下部バンド (-2σ)
+    pub lower_band: Option<f64>,
 }
 
 /// WebSocket から受信するメッセージ構造体
