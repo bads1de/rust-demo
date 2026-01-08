@@ -1,12 +1,13 @@
-// モジュールの宣言
-mod api;
-mod indicators;
-mod models;
-mod websocket;
+use rust_chart_lib::api::fetch_candles as lib_fetch_candles;
+use rust_chart_lib::models::KlineWithIndicator;
+use rust_chart_lib::websocket::start_websocket_listener;
 
-// 必要な機能をインポート
-use api::fetch_candles;
-use websocket::start_websocket_listener;
+/// Tauriのコマンドとして登録するためのラッパー
+/// ライブラリ側のロジックを呼び出します。
+#[tauri::command]
+async fn fetch_candles() -> Result<Vec<KlineWithIndicator>, String> {
+    lib_fetch_candles().await
+}
 
 fn main() {
     tauri::Builder::default()

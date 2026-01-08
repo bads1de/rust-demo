@@ -18,3 +18,4 @@ pub fn calculate_sma(data: &[KlineData], period: usize) -> Vec<Option<f64>> {
     }
     result
 }
+
