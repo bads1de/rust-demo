@@ -45,6 +45,18 @@ pub struct KlineWithIndicator {
     pub upper_band: Option<f64>,
     /// ボリンジャーバンド下部バンド (-2σ)
     pub lower_band: Option<f64>,
+    /// RSI (Relative Strength Index)
+    pub rsi: Option<f64>,
+    /// MACD (Moving Average Convergence Divergence) ライン
+    pub macd: Option<f64>,
+    /// MACD シグナルライン
+    pub macd_signal: Option<f64>,
+    /// MACD ヒストグラム
+    pub macd_hist: Option<f64>,
+    /// ストキャスティクス %K
+    pub stoch_k: Option<f64>,
+    /// ストキャスティクス %D
+    pub stoch_d: Option<f64>,
 }
 
 /// WebSocket から受信するメッセージ構造体

@@ -1,6 +1,6 @@
 use tauri::State;
 use crate::models::{KlineData, KlineWithIndicator};
-use crate::indicators::{calculate_sma, calculate_bollinger_bands};
+use crate::indicators::{calculate_sma, calculate_bollinger_bands, calculate_rsi, calculate_macd, calculate_stoch};
 use crate::state::AppState;
 
 /// 過去のローソク足データを Binance API から取得し、指標を計算して返す
@@ -70,10 +70,12 @@ pub async fn fetch_candles(
         *state_klines = klines.clone();
     }
 
-    // SMA を計算
+    // 各指標を計算 (Rustの並行処理を使えばさらに高速化可能だが、ここでは順次実行)
     let sma_values = calculate_sma(&klines, period);
-    // ボリンジャーバンド を計算
     let (upper_band, lower_band) = calculate_bollinger_bands(&klines, period, multiplier);
+    let rsi_values = calculate_rsi(&klines, 14);
+    let (macd, signal, hist) = calculate_macd(&klines, 12, 26, 9);
+    let (stoch_k, stoch_d) = calculate_stoch(&klines, 14, 3, 3);
 
     // データを結合
     let combined = klines.into_iter().enumerate()
@@ -82,6 +84,12 @@ pub async fn fetch_candles(
             sma: sma_values[i],
             upper_band: upper_band[i],
             lower_band: lower_band[i],
+            rsi: rsi_values[i],
+            macd: macd[i],
+            macd_signal: signal[i],
+            macd_hist: hist[i],
+            stoch_k: stoch_k[i],
+            stoch_d: stoch_d[i],
         })
         .collect();
 
