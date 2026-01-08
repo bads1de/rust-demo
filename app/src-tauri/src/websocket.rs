@@ -34,49 +34,12 @@ pub async fn start_websocket_listener(app_handle: AppHandle) {
 
                     // 複合ストリームのパース
                     if let Ok(payload) = serde_json::from_str::<CombinedStreamPayload>(text) {
-                        let symbol = payload.data.symbol.clone();
+                        let symbol = payload.data.symbol;
                         let new_kline = payload.data.kline;
                         let state = app_handle.state::<AppState>();
                         
-                        // 共有データをロックして更新
-                        let indicators = {
-                            let mut klines_map = state.klines.lock().unwrap();
-                            // シンボルに対応する Vec を取得または作成
-                            let klines = klines_map.entry(symbol.clone()).or_insert_with(Vec::new);
-                            
-                            if klines.is_empty() {
-                                None
-                            } else {
-                                let last_idx = klines.len() - 1;
-                                if klines[last_idx].time == new_kline.time {
-                                    klines[last_idx] = new_kline.clone();
-                                } else if klines[last_idx].time < new_kline.time {
-                                    klines.push(new_kline.clone());
-                                    if klines.len() > 2000 { klines.remove(0); }
-                                }
-
-                                let config = state.config.lock().unwrap();
-                                let p = config.period;
-                                let m = config.multiplier;
-
-                                // 指標計算
-                                let sma_vals = calculate_sma(klines, p);
-                                let (u_vals, l_vals) = calculate_bollinger_bands(klines, p, m);
-                                let rsi_vals = calculate_rsi(klines, 14);
-                                let (macd_v, signal_v, hist_v) = calculate_macd(klines, 12, 26, 9);
-                                let (st_k, st_d) = calculate_stoch(klines, 14, 3, 3);
-                                
-                                let i = klines.len() - 1;
-                                Some((sma_vals[i], u_vals[i], l_vals[i], rsi_vals[i], macd_v[i], signal_v[i], hist_v[i], st_k[i], st_d[i]))
-                            }
-                        };
-
-                        if let Some((sma, upper_band, lower_band, rsi, macd, macd_signal, macd_hist, stoch_k, stoch_d)) = indicators {
-                            let update_data = KlineWithIndicator {
-                                symbol: symbol.clone(),
-                                kline: new_kline,
-                                sma, upper_band, lower_band, rsi, macd, macd_signal, macd_hist, stoch_k, stoch_d
-                            };
+                        // AppStateのメソッドに委譲
+                        if let Some(update_data) = state.update_and_calculate(&symbol, new_kline) {
                             let _ = app_handle.emit("kline-update", update_data);
                         }
                     }
