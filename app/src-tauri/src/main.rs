@@ -7,7 +7,7 @@ use tauri::State;
 #[tauri::command]
 async fn fetch_candles(
     state: State<'_, AppState>,
-    symbol: String, // 追加
+    symbol: String,
     period: usize,
     multiplier: f64,
 ) -> Result<Vec<KlineWithIndicator>, String> {

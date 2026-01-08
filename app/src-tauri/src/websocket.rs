@@ -2,9 +2,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use futures_util::StreamExt;
 use tokio_tungstenite::connect_async;
 use url::Url;
-use crate::models::{CombinedStreamPayload, KlineWithIndicator};
+use crate::models::CombinedStreamPayload;
 use crate::state::AppState;
-use crate::indicators::{calculate_sma, calculate_bollinger_bands, calculate_rsi, calculate_macd, calculate_stoch};
 
 /// WebSocket接続を管理し、データを受信してフロントエンドに送信するタスク
 pub async fn start_websocket_listener(app_handle: AppHandle) {

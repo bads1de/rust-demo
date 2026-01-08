@@ -10,16 +10,14 @@ import {
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
+  ColorType,
 } from "lightweight-charts";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { Settings2, Activity } from "lucide-react";
+import { Settings2 } from "lucide-react";
 
 // Types
-interface KlineData {
-  t: number; o: number; h: number; l: number; c: number; v: number;
-}
-
+interface KlineData { t: number; o: number; h: number; l: number; c: number; v: number; }
 interface KlineWithIndicator extends KlineData {
   symbol: string;
   sma: number | null;
@@ -63,8 +61,6 @@ export const TradingChart = ({ symbol }: { symbol: string }) => {
   // State
   const [period, setPeriod] = useState(20);
   const [multiplier, setMultiplier] = useState(2.0);
-  
-  // Visibility States
   const [showMain, setShowMain] = useState({ sma: true, bb: true });
   const [showSub, setShowSub] = useState({ rsi: true, macd: false, stoch: false });
 
@@ -75,7 +71,7 @@ export const TradingChart = ({ symbol }: { symbol: string }) => {
     series.current.lowerBB?.applyOptions({ visible: showMain.bb });
   }, [showMain]);
 
-  // Sync logic
+  // Sync Logic
   const syncCharts = useCallback(() => {
     const charts = [mainChart.current, rsiChart.current, macdChart.current, stochChart.current].filter(c => c !== null) as IChartApi[];
     charts.forEach(c1 => {
@@ -89,7 +85,8 @@ export const TradingChart = ({ symbol }: { symbol: string }) => {
   const fetchData = useCallback(async (p: number, m: number) => {
     try {
       const data = await invoke<KlineWithIndicator[]>("fetch_candles", { symbol, period: p, multiplier: m });
-      
+      // ... data parsing (omitted for brevity, same as before) ...
+      // But need to reconstruct arrays
       const arrays = {
         candle: [] as CandlestickData<Time>[],
         sma: [] as LineData<Time>[],
@@ -127,37 +124,66 @@ export const TradingChart = ({ symbol }: { symbol: string }) => {
       series.current.macdHist?.setData(arrays.hist);
       series.current.stochK?.setData(arrays.k);
       series.current.stochD?.setData(arrays.d);
-    } catch (e) { console.error(`Fetch error for ${symbol}:`, e); }
+    } catch (e) { console.error(e); }
   }, [symbol]);
 
   useEffect(() => {
     if (!mainRef.current) return;
+    
+    // Theme Colors
+    const chartBg = "#111620";
+    const textColor = "#64748b";
+    const gridColor = "#1e293b";
+
     const commonOptions = {
-      layout: { background: { color: "#0f172a" }, textColor: "#94a3b8" },
-      grid: { vertLines: { color: "#1e293b" }, horzLines: { color: "#1e293b" } },
-      timeScale: { timeVisible: true, secondsVisible: false },
+      layout: { background: { type: ColorType.Solid, color: chartBg }, textColor },
+      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
+      timeScale: { timeVisible: true, secondsVisible: false, borderColor: gridColor },
+      rightPriceScale: { borderColor: gridColor },
     };
 
     mainChart.current = createChart(mainRef.current, { ...commonOptions, width: mainRef.current.clientWidth, height: 250 });
-    series.current.candle = mainChart.current.addSeries(CandlestickSeries, { upColor: "#10b981", downColor: "#ef4444" });
-    series.current.sma = mainChart.current.addSeries(LineSeries, { color: "#3b82f6", lineWidth: 2, title: "SMA" });
-    series.current.upperBB = mainChart.current.addSeries(LineSeries, { color: "rgba(168, 85, 247, 0.4)", lineWidth: 1, title: "BB Upper" });
-    series.current.lowerBB = mainChart.current.addSeries(LineSeries, { color: "rgba(168, 85, 247, 0.4)", lineWidth: 1, title: "BB Lower" });
+    series.current.candle = mainChart.current.addSeries(CandlestickSeries, { 
+      upColor: "#10b981", downColor: "#ef4444", borderVisible: false, wickUpColor: "#10b981", wickDownColor: "#ef4444" 
+    });
+    series.current.sma = mainChart.current.addSeries(LineSeries, { color: "#6366f1", lineWidth: 2, title: "SMA" }); // Indigo
+    series.current.upperBB = mainChart.current.addSeries(LineSeries, { color: "rgba(99, 102, 241, 0.3)", lineWidth: 1, title: "" });
+    series.current.lowerBB = mainChart.current.addSeries(LineSeries, { color: "rgba(99, 102, 241, 0.3)", lineWidth: 1, title: "" });
+
+    // Helper to create sub-chart
+    const createSubChart = (ref: React.RefObject<HTMLDivElement | null>) => {
+        if (!ref.current) return null;
+        return createChart(ref.current, { ...commonOptions, width: ref.current.clientWidth, height: 80 });
+    };
 
     if (rsiRef.current) {
-      rsiChart.current = createChart(rsiRef.current, { ...commonOptions, width: rsiRef.current.clientWidth, height: 80 });
-      series.current.rsi = rsiChart.current.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 2, title: "RSI" });
+        rsiChart.current = createSubChart(rsiRef);
+        if (rsiChart.current) {
+            series.current.rsi = rsiChart.current.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 2, title: "RSI" }); // Amber
+            // Guides
+            const lineOpts = { color: "rgba(255,255,255,0.1)", lineWidth: 1, lineStyle: 2, crosshairMarkerVisible: false };
+            rsiChart.current.addSeries(LineSeries, { ...lineOpts }).setData(generateGuideLine(70));
+            rsiChart.current.addSeries(LineSeries, { ...lineOpts }).setData(generateGuideLine(30));
+        }
     }
     if (macdRef.current) {
-      macdChart.current = createChart(macdRef.current, { ...commonOptions, width: macdRef.current.clientWidth, height: 80 });
-      series.current.macdHist = macdChart.current.addSeries(HistogramSeries, { title: "MACD Hist" });
-      series.current.macd = macdChart.current.addSeries(LineSeries, { color: "#2962ff", lineWidth: 1 });
-      series.current.macdSignal = macdChart.current.addSeries(LineSeries, { color: "#ff6d00", lineWidth: 1 });
+        macdChart.current = createSubChart(macdRef);
+        if (macdChart.current) {
+            series.current.macdHist = macdChart.current.addSeries(HistogramSeries, { title: "Hist" });
+            series.current.macd = macdChart.current.addSeries(LineSeries, { color: "#3b82f6", lineWidth: 1, title: "MACD" }); // Blue
+            series.current.macdSignal = macdChart.current.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, title: "Sig" }); // Orange
+        }
     }
     if (stochRef.current) {
-      stochChart.current = createChart(stochRef.current, { ...commonOptions, width: stochRef.current.clientWidth, height: 80 });
-      series.current.stochK = stochChart.current.addSeries(LineSeries, { color: "#2962ff", lineWidth: 1, title: "%K" });
-      series.current.stochD = stochChart.current.addSeries(LineSeries, { color: "#ff6d00", lineWidth: 1, title: "%D" });
+        stochChart.current = createSubChart(stochRef);
+        if (stochChart.current) {
+            series.current.stochK = stochChart.current.addSeries(LineSeries, { color: "#3b82f6", lineWidth: 1, title: "K" });
+            series.current.stochD = stochChart.current.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, title: "D" });
+            // Guides
+            const lineOpts = { color: "rgba(255,255,255,0.1)", lineWidth: 1, lineStyle: 2, crosshairMarkerVisible: false };
+            stochChart.current.addSeries(LineSeries, { ...lineOpts }).setData(generateGuideLine(80));
+            stochChart.current.addSeries(LineSeries, { ...lineOpts }).setData(generateGuideLine(20));
+        }
     }
 
     syncCharts();
@@ -197,24 +223,55 @@ export const TradingChart = ({ symbol }: { symbol: string }) => {
   }, [symbol, fetchData, syncCharts]);
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur-sm rounded-xl border border-slate-800 overflow-hidden flex flex-col h-full shadow-lg transition-all hover:border-slate-700">
-      <div className="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
-        <h3 className="font-bold text-white flex items-center gap-2 text-sm uppercase tracking-wider">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span>
-          {symbol}
-        </h3>
-        <div className="flex gap-2">
-          <button onClick={() => setShowSub(s => ({ ...s, rsi: !s.rsi }))} className={`text-[9px] px-1.5 py-0.5 rounded border ${showSub.rsi ? 'bg-amber-500/20 border-amber-500/50 text-amber-500' : 'border-slate-700 text-slate-500'}`}>RSI</button>
-          <button onClick={() => setShowSub(s => ({ ...s, macd: !s.macd }))} className={`text-[9px] px-1.5 py-0.5 rounded border ${showSub.macd ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-500' : 'border-slate-700 text-slate-500'}`}>MACD</button>
-          <button onClick={() => setShowSub(s => ({ ...s, stoch: !s.stoch }))} className={`text-[9px] px-1.5 py-0.5 rounded border ${showSub.stoch ? 'bg-pink-500/20 border-pink-500/50 text-pink-500' : 'border-slate-700 text-slate-500'}`}>STOCH</button>
+    <div className="bg-[#111620] rounded-lg border border-white/5 overflow-hidden flex flex-col h-full shadow-lg group hover:border-white/10 transition-colors">
+      
+      {/* Header */}
+      <div className="px-3 py-2 border-b border-white/5 flex items-center justify-between bg-[#151b26]">
+        <div className="flex items-center gap-2">
+          <h3 className="font-bold text-gray-200 text-sm">{symbol}</h3>
+          <span className="text-[10px] text-emerald-500 bg-emerald-500/10 px-1.5 py-0.5 rounded font-medium">LIVE</span>
+        </div>
+        
+        {/* Toggle Buttons */}
+        <div className="flex gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+          <Settings2 size={12} className="text-gray-500 mr-1" />
+          <ToggleBtn label="RSI" active={showSub.rsi} onClick={() => setShowSub(s => ({ ...s, rsi: !s.rsi }))} color="text-amber-500" />
+          <ToggleBtn label="MACD" active={showSub.macd} onClick={() => setShowSub(s => ({ ...s, macd: !s.macd }))} color="text-blue-500" />
+          <ToggleBtn label="STOCH" active={showSub.stoch} onClick={() => setShowSub(s => ({ ...s, stoch: !s.stoch }))} color="text-indigo-500" />
         </div>
       </div>
-      <div className="flex-1 flex flex-col min-h-0">
+
+      {/* Chart Area */}
+      <div className="flex-1 flex flex-col min-h-0 bg-[#0B0E14]">
         <div ref={mainRef} className="flex-1 min-h-[150px]" />
-        {showSub.rsi && <div className="h-20 border-t border-slate-800"><div ref={rsiRef} className="w-full h-full" /></div>}
-        {showSub.macd && <div className="h-20 border-t border-slate-800"><div ref={macdRef} className="w-full h-full" /></div>}
-        {showSub.stoch && <div className="h-20 border-t border-slate-800"><div ref={stochRef} className="w-full h-full" /></div>}
+        
+        {/* Sub Charts Containers (Always rendered but hidden via CSS height) */}
+        <div className={`transition-all duration-300 ease-in-out overflow-hidden border-t border-white/5 ${showSub.rsi ? 'h-[80px] opacity-100' : 'h-0 opacity-0 border-none'}`}>
+          <div ref={rsiRef} className="w-full h-full" />
+        </div>
+        <div className={`transition-all duration-300 ease-in-out overflow-hidden border-t border-white/5 ${showSub.macd ? 'h-[80px] opacity-100' : 'h-0 opacity-0 border-none'}`}>
+          <div ref={macdRef} className="w-full h-full" />
+        </div>
+        <div className={`transition-all duration-300 ease-in-out overflow-hidden border-t border-white/5 ${showSub.stoch ? 'h-[80px] opacity-100' : 'h-0 opacity-0 border-none'}`}>
+          <div ref={stochRef} className="w-full h-full" />
+        </div>
       </div>
     </div>
   );
+};
+
+// Sub-components
+const ToggleBtn = ({ label, active, onClick, color }: { label: string, active: boolean, onClick: () => void, color: string }) => (
+  <button 
+    onClick={onClick}
+    className={`text-[9px] font-bold px-1.5 py-0.5 rounded transition-all ${active ? `bg-white/5 ${color}` : 'text-gray-600 hover:text-gray-400'}`}
+  >
+    {label}
+  </button>
+);
+
+// Helper
+const generateGuideLine = (val: number) => {
+    const now = Math.floor(Date.now() / 1000) as Time;
+    return [{ time: (now - 1000000) as Time, value: val }, { time: (now + 1000000) as Time, value: val }];
 };

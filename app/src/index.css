@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+@layer base {
+  /* Global Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #334155;
+  }
+
+  /* For Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #1e293b transparent;
+  }
+
+  body {
+    @apply bg-[#0B0E14] overflow-x-hidden;
+  }
+}
