@@ -9,26 +9,19 @@ where
     s.parse::<f64>().map_err(serde::de::Error::custom)
 }
 
-/// ローソク足データ (Kline/Candlestick data) を表す構造体
-/// Binance API から取得される個々のデータポイントに対応します。
+/// ローソク足データ (Kline/Candlestick data)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KlineData {
-    /// タイムスタンプ (Unix time in milliseconds)
     #[serde(rename = "t")]
     pub time: i64,
-    /// 始値 (Open price)
     #[serde(rename = "o", deserialize_with = "deserialize_f64_from_string")]
     pub open: f64,
-    /// 高値 (High price)
     #[serde(rename = "h", deserialize_with = "deserialize_f64_from_string")]
     pub high: f64,
-    /// 安値 (Low price)
     #[serde(rename = "l", deserialize_with = "deserialize_f64_from_string")]
     pub low: f64,
-    /// 終値 (Close price)
     #[serde(rename = "c", deserialize_with = "deserialize_f64_from_string")]
     pub close: f64,
-    /// 出来高 (Volume)
     #[serde(rename = "v", deserialize_with = "deserialize_f64_from_string")]
     pub volume: f64,
 }
@@ -36,34 +29,36 @@ pub struct KlineData {
 /// ローソク足データとテクニカル指標を合わせた構造体
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KlineWithIndicator {
-    /// 元のローソク足データをフラットに展開
+    /// 通貨ペア名 (例: "BTCUSDT")
+    pub symbol: String,
+    /// 元のローソク足データ
     #[serde(flatten)]
     pub kline: KlineData,
-    /// 移動平均線 (Simple Moving Average)
     pub sma: Option<f64>,
-    /// ボリンジャーバンド上部バンド (+2σ)
     pub upper_band: Option<f64>,
-    /// ボリンジャーバンド下部バンド (-2σ)
     pub lower_band: Option<f64>,
-    /// RSI (Relative Strength Index)
     pub rsi: Option<f64>,
-    /// MACD (Moving Average Convergence Divergence) ライン
     pub macd: Option<f64>,
-    /// MACD シグナルライン
     pub macd_signal: Option<f64>,
-    /// MACD ヒストグラム
     pub macd_hist: Option<f64>,
-    /// ストキャスティクス %K
     pub stoch_k: Option<f64>,
-    /// ストキャスティクス %D
     pub stoch_d: Option<f64>,
 }
 
-/// WebSocket から受信するメッセージ構造体
-/// リアルタイムの Kline データ更新を含みます。
+/// WebSocket から受信する個別のメッセージ
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct KlineMessage {
+    /// シンボル名
+    #[serde(rename = "s")]
+    pub symbol: String,
     /// Kline データの実体
     #[serde(rename = "k")]
     pub kline: KlineData,
+}
+
+/// 複数のストリームを同時に購読した際の WebSocket ラッパー
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CombinedStreamPayload {
+    pub stream: String,
+    pub data: KlineMessage,
 }

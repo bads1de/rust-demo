@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Mutex;
 use crate::models::KlineData;
 
@@ -9,8 +10,8 @@ pub struct Config {
 
 /// アプリケーション全体で共有する状態
 pub struct AppState {
-    /// 過去のローソク足データを保持する
-    pub klines: Mutex<Vec<KlineData>>,
+    /// シンボルごとのローソク足データを保持する HashMap
+    pub klines: Mutex<HashMap<String, Vec<KlineData>>>,
     /// 現在の計算設定を保持する
     pub config: Mutex<Config>,
 }
@@ -18,7 +19,7 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Self {
         Self {
-            klines: Mutex::new(Vec::new()),
+            klines: Mutex::new(HashMap::new()),
             config: Mutex::new(Config {
                 period: 20,
                 multiplier: 2.0,
