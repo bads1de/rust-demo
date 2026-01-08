@@ -24,10 +24,8 @@ fn test_state_update_logic() {
     assert!(res1.is_some());
     assert_eq!(res1.unwrap().kline.close, 50000.0);
 
-    {
-        let map = state.klines.lock().unwrap();
-        assert_eq!(map.get(symbol).unwrap().len(), 1);
-    }
+    // DashMapは直接アクセス可能
+    assert_eq!(state.klines.get(symbol).unwrap().len(), 1);
 
     // 2. 同じ時刻の更新 (価格変動)
     let k1_update = create_kline(1000, 50100.0);
@@ -36,21 +34,15 @@ fn test_state_update_logic() {
     assert_eq!(res2.unwrap().kline.close, 50100.0);
 
     {
-        let map = state.klines.lock().unwrap();
-        let list = map.get(symbol).unwrap();
+        let list = state.klines.get(symbol).unwrap();
         assert_eq!(list.len(), 1); // 増えていないこと
         assert_eq!(list[0].close, 50100.0); // 更新されていること
     }
 
     // 3. 次の時刻の追加
     let k2 = create_kline(2000, 50200.0);
-    let res3 = state.update_and_calculate(symbol, k2.clone());
-    assert!(res3.is_some());
-
-    {
-        let map = state.klines.lock().unwrap();
-        assert_eq!(map.get(symbol).unwrap().len(), 2);
-    }
+    let _res3 = state.update_and_calculate(symbol, k2.clone());
+    assert_eq!(state.klines.get(symbol).unwrap().len(), 2);
 }
 
 #[test]
@@ -64,13 +56,12 @@ fn test_state_history_limit() {
         state.update_and_calculate(symbol, k);
     }
 
-    let map = state.klines.lock().unwrap();
-    let list = map.get(symbol).unwrap();
+    let list = state.klines.get(symbol).unwrap();
     
     // 2000個に制限されているか
     assert_eq!(list.len(), 2000);
     
-    // 最初のデータ (index 0) は time=5000 (i=5) であるはず (0,1,2,3,4 は削除された)
+    // 最初のデータ (index 0) は time=5000 (i=5) であるはず
     assert_eq!(list[0].time, 5000);
     // 最後のデータ
     assert_eq!(list.last().unwrap().time, 2004000);
