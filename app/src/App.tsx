@@ -27,6 +27,10 @@ function App() {
   useEffect(() => {
     if (selectedExchange === "okx") {
       setSelectedSymbol("BTC-USDT");
+    } else if (selectedExchange === "kucoin") {
+      setSelectedSymbol("BTC-USDT");
+    } else if (selectedExchange === "kraken") {
+      setSelectedSymbol("XBTUSDT");
     } else {
       setSelectedSymbol("BTCUSDT");
     }
@@ -144,6 +148,26 @@ function App() {
               }`}
             >
               OKX
+            </button>
+            <button
+              onClick={() => setSelectedExchange("kucoin")}
+              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
+                selectedExchange === "kucoin"
+                  ? "bg-teal-500 text-white"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              KUCOIN
+            </button>
+            <button
+              onClick={() => setSelectedExchange("kraken")}
+              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
+                selectedExchange === "kraken"
+                  ? "bg-purple-500 text-white"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              KRAKEN
             </button>
           </div>
         </div>
