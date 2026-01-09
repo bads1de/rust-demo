@@ -100,105 +100,83 @@ function App() {
       <TitleBar />
 
       {/* Header */}
-      <header className="mt-9 h-16 flex items-center justify-between px-6 bg-[#111620] border-b border-white/5 shrink-0">
-        <div className="flex items-center gap-4">
+      <header className="mt-9 h-18 flex items-center justify-between px-6 bg-[#111620] border-b border-white/5 shrink-0 gap-4">
+        {/* Left: Title & Stats */}
+        <div className="flex flex-col justify-center shrink-0">
           <h1 className="text-xl font-black text-white tracking-tighter flex items-center gap-2">
             <Zap size={20} className="text-indigo-500 fill-current" />
             MARKET SCANNER
           </h1>
-          <div className="h-6 w-px bg-white/10"></div>
-          <p className="text-xs font-mono text-gray-500">
-            MONITORING {Object.keys(marketData).length} SYMBOLS
-          </p>
-
-          <div className="ml-4 flex items-center bg-[#0B0E14] rounded-lg p-1 border border-white/5 space-x-1">
-            <button
-              onClick={() => handleExchangeChange("binance")}
-              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
-                selectedExchange === "binance"
-                  ? "bg-indigo-500 text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              BINANCE
-            </button>
-            <button
-              onClick={() => handleExchangeChange("bybit")}
-              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
-                selectedExchange === "bybit"
-                  ? "bg-orange-500 text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              BYBIT
-            </button>
-            <button
-              onClick={() => handleExchangeChange("bitget")}
-              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
-                selectedExchange === "bitget"
-                  ? "bg-cyan-500 text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              BITGET
-            </button>
-            <button
-              onClick={() => handleExchangeChange("okx")}
-              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
-                selectedExchange === "okx"
-                  ? "bg-white text-black"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              OKX
-            </button>
-            <button
-              onClick={() => handleExchangeChange("kucoin")}
-              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
-                selectedExchange === "kucoin"
-                  ? "bg-teal-500 text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              KUCOIN
-            </button>
-            <button
-              onClick={() => handleExchangeChange("kraken")}
-              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
-                selectedExchange === "kraken"
-                  ? "bg-purple-500 text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              KRAKEN
-            </button>
-            <button
-              onClick={() => handleExchangeChange("gate")}
-              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
-                selectedExchange === "gate"
-                  ? "bg-red-500 text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              GATE
-            </button>
-            <button
-              onClick={() => handleExchangeChange("mexc")}
-              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
-                selectedExchange === "mexc"
-                  ? "bg-blue-500 text-white"
-                  : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
-              MEXC
-            </button>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded flex items-center gap-1.5 border border-emerald-400/20">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+              {Object.keys(marketData).length} LIVE PAIRS
+            </span>
+            <span className="text-[10px] font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+              8 EXCHANGES
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="relative">
+        {/* Center: Exchange Selector */}
+        <div className="flex-1 flex justify-center min-w-0 mx-4">
+          <div className="flex items-center bg-[#0B0E14] rounded-lg p-1 border border-white/5 space-x-1 overflow-x-auto max-w-full custom-scrollbar">
+            <ExchangeBtn
+              name="BINANCE"
+              active={selectedExchange === "binance"}
+              onClick={() => handleExchangeChange("binance")}
+              activeColor="bg-[#F0B90B] text-black"
+            />
+            <ExchangeBtn
+              name="BYBIT"
+              active={selectedExchange === "bybit"}
+              onClick={() => handleExchangeChange("bybit")}
+              activeColor="bg-[#171A1E] text-[#F7A600] border border-[#F7A600]/20"
+            />
+            <ExchangeBtn
+              name="BITGET"
+              active={selectedExchange === "bitget"}
+              onClick={() => handleExchangeChange("bitget")}
+              activeColor="bg-[#00F0FF] text-black"
+            />
+            <ExchangeBtn
+              name="OKX"
+              active={selectedExchange === "okx"}
+              onClick={() => handleExchangeChange("okx")}
+              activeColor="bg-white text-black"
+            />
+            <ExchangeBtn
+              name="KUCOIN"
+              active={selectedExchange === "kucoin"}
+              onClick={() => handleExchangeChange("kucoin")}
+              activeColor="bg-[#00D095] text-white"
+            />
+            <ExchangeBtn
+              name="KRAKEN"
+              active={selectedExchange === "kraken"}
+              onClick={() => handleExchangeChange("kraken")}
+              activeColor="bg-[#5841D8] text-white"
+            />
+            <ExchangeBtn
+              name="GATE"
+              active={selectedExchange === "gate"}
+              onClick={() => handleExchangeChange("gate")}
+              activeColor="bg-[#D32F2F] text-white"
+            />
+            <ExchangeBtn
+              name="MEXC"
+              active={selectedExchange === "mexc"}
+              onClick={() => handleExchangeChange("mexc")}
+              activeColor="bg-[#2E7BCF] text-white"
+            />
+          </div>
+        </div>
+
+        {/* Right: Search */}
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="relative group">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-500 transition-colors"
               size={14}
             />
             <input
@@ -206,7 +184,7 @@ function App() {
               placeholder="Search pairs..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-[#0B0E14] border border-white/5 rounded-full pl-9 pr-4 py-1.5 text-xs focus:outline-none focus:border-indigo-500 transition-all w-64"
+              className="bg-[#0B0E14] border border-white/5 rounded-full pl-9 pr-4 py-1.5 text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-all w-48 focus:w-64"
             />
           </div>
         </div>
@@ -295,3 +273,49 @@ function App() {
 }
 
 export default App;
+
+
+
+const ExchangeBtn = ({
+
+  name,
+
+  active,
+
+  onClick,
+
+  activeColor,
+
+}: {
+
+  name: string;
+
+  active: boolean;
+
+  onClick: () => void;
+
+  activeColor: string;
+
+}) => (
+
+  <button
+
+    onClick={onClick}
+
+    className={`px-3 py-1.5 text-[10px] font-bold rounded-md transition-all whitespace-nowrap ${
+
+      active
+
+        ? activeColor + " shadow-lg scale-105"
+
+        : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+
+    }`}
+
+  >
+
+    {name}
+
+  </button>
+
+);
