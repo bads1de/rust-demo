@@ -2,12 +2,14 @@ use tauri::State;
 use crate::models::{KlineData, KlineWithIndicator};
 use crate::indicators::{calculate_sma, calculate_bollinger_bands, calculate_rsi, calculate_macd, calculate_stoch};
 use crate::state::AppState;
-use crate::exchanges::{Exchange, binance::Binance, bybit::Bybit};
+use crate::exchanges::{Exchange, binance::Binance, bybit::Bybit, bitget::Bitget, okx::Okx};
 
 /// 取引所インスタンスを生成するヘルパー
 fn get_exchange_impl(name: &str) -> Box<dyn Exchange> {
     match name.to_lowercase().as_str() {
         "bybit" => Box::new(Bybit::new()),
+        "bitget" => Box::new(Bitget::new()),
+        "okx" => Box::new(Okx::new()),
         _ => Box::new(Binance::new()), // Default to Binance
     }
 }
@@ -36,7 +38,7 @@ pub async fn fetch_candles(
     let exchange = get_exchange_impl(&exchange_name);
     
     // Bybit等のインターバル形式変換が必要ならここでやる
-    // 今回は簡単のため "1m" (Binance) と "1" (Bybit) の違いを吸収するロジックを入れる
+    // 今回は簡単のため "1m" (Binance/Bitget/OKX) と "1" (Bybit) の違いを吸収するロジックを入れる
     let interval = match exchange.id() {
         "bybit" => "1",
         _ => "1m",

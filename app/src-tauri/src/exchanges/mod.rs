@@ -16,3 +16,5 @@ pub trait Exchange: Send + Sync {
 
 pub mod binance;
 pub mod bybit;
+pub mod bitget;
+pub mod okx;

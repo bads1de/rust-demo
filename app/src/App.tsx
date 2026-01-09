@@ -23,6 +23,15 @@ function App() {
   const [sortBy, setSortBy] = useState<"symbol" | "rsi" | "change">("symbol");
   const [sortOrder, setSortByOrder] = useState<"asc" | "desc">("asc");
 
+  // 取引所が変更されたら、デフォルトのシンボル形式に合わせる
+  useEffect(() => {
+    if (selectedExchange === "okx") {
+      setSelectedSymbol("BTC-USDT");
+    } else {
+      setSelectedSymbol("BTCUSDT");
+    }
+  }, [selectedExchange]);
+
   // WebSocketイベントの監視 (全銘柄)
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -115,6 +124,26 @@ function App() {
               }`}
             >
               BYBIT
+            </button>
+            <button
+              onClick={() => setSelectedExchange("bitget")}
+              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
+                selectedExchange === "bitget"
+                  ? "bg-cyan-500 text-white"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              BITGET
+            </button>
+            <button
+              onClick={() => setSelectedExchange("okx")}
+              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
+                selectedExchange === "okx"
+                  ? "bg-white text-black"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              OKX
             </button>
           </div>
         </div>
