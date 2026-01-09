@@ -23,3 +23,6 @@ pub mod websocket;
 
 /// スレッドセーフな状態管理（AppState）
 pub mod state;
+
+/// 取引所ごとの実装を抽象化するモジュール
+pub mod exchanges;

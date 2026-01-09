@@ -2,48 +2,27 @@ use tauri::State;
 use crate::models::{KlineData, KlineWithIndicator};
 use crate::indicators::{calculate_sma, calculate_bollinger_bands, calculate_rsi, calculate_macd, calculate_stoch};
 use crate::state::AppState;
-use serde_json::Value;
+use crate::exchanges::{Exchange, binance::Binance, bybit::Bybit};
 
-/// Binanceから取引可能な全USDT銘柄を取得する
-pub async fn get_all_symbols() -> Result<Vec<String>, String> {
-    let client = reqwest::Client::new();
-    let res = client
-        .get("https://api.binance.com/api/v3/exchangeInfo")
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    let json: Value = res.json().await.map_err(|e| e.to_string())?;
-    
-    let symbols_raw = json["symbols"]
-        .as_array()
-        .ok_or("Invalid exchangeInfo format")?;
-
-    // デバッグ用: 最初の5件の構造を表示
-    /*
-    for (i, s) in symbols_raw.iter().enumerate().take(5) {
-        println!("Symbol {}: status={}, quoteAsset={}, permissions={:?}", 
-            s["symbol"], s["status"], s["quoteAsset"], s["permissions"]);
+/// 取引所インスタンスを生成するヘルパー
+fn get_exchange_impl(name: &str) -> Box<dyn Exchange> {
+    match name.to_lowercase().as_str() {
+        "bybit" => Box::new(Bybit::new()),
+        _ => Box::new(Binance::new()), // Default to Binance
     }
-    */
+}
 
-    let symbols = symbols_raw.iter()
-        .filter(|s| {
-            // かなり緩い条件で試す
-            let is_usdt = s["quoteAsset"].as_str() == Some("USDT");
-            let is_trading = s["status"].as_str() == Some("TRADING");
-            is_usdt && is_trading
-        })
-        .map(|s| s["symbol"].as_str().unwrap().to_string())
-        .collect();
-
-    Ok(symbols)
+/// 全USDT銘柄を取得する (デフォルトはBinanceだが、将来的には引数で指定可能にすべき)
+pub async fn get_all_symbols() -> Result<Vec<String>, String> {
+    let exchange = Binance::new();
+    exchange.get_symbols().await.map_err(|e| e.to_string())
 }
 
 /// 過去のローソク足データを取得する
 #[tauri::command]
 pub async fn fetch_candles(
     state: State<'_, AppState>,
+    exchange_name: String,
     symbol: String,
     period: usize,
     multiplier: f64,
@@ -54,40 +33,22 @@ pub async fn fetch_candles(
         config.multiplier = multiplier;
     }
 
-    let client = reqwest::Client::new();
-    let res = client
-        .get("https://api.binance.com/api/v3/klines")
-        .query(&[
-            ("symbol", symbol.as_str()),
-            ("interval", "1m"),
-            ("limit", "1000"),
-        ])
-        .send()
-        .await
+    let exchange = get_exchange_impl(&exchange_name);
+    
+    // Bybit等のインターバル形式変換が必要ならここでやる
+    // 今回は簡単のため "1m" (Binance) と "1" (Bybit) の違いを吸収するロジックを入れる
+    let interval = match exchange.id() {
+        "bybit" => "1",
+        _ => "1m",
+    };
+
+    let klines = exchange.fetch_candles(&symbol, interval).await
         .map_err(|e| e.to_string())?;
 
-    if !res.status().is_success() {
-        return Err(format!("API Error for {}: {}", symbol, res.status()));
-    }
-
-    let rows: Vec<Vec<serde_json::Value>> = res.json().await.map_err(|e| e.to_string())?;
-    let mut klines = Vec::new();
-
-    for row in rows {
-        if let (Some(t), Some(o), Some(h), Some(l), Some(c), Some(v)) = (row.get(0), row.get(1), row.get(2), row.get(3), row.get(4), row.get(5)) {
-             klines.push(KlineData {
-                 time: t.as_i64().unwrap_or(0),
-                 open: o.as_str().unwrap_or("0").parse().unwrap_or(0.0),
-                 high: h.as_str().unwrap_or("0").parse().unwrap_or(0.0),
-                 low: l.as_str().unwrap_or("0").parse().unwrap_or(0.0),
-                 close: c.as_str().unwrap_or("0").parse().unwrap_or(0.0),
-                 volume: v.as_str().unwrap_or("0").parse().unwrap_or(0.0),
-             });
-        }
-    }
-
+    // 取得したデータを状態にキャッシュ
     state.klines.insert(symbol.clone(), klines.clone());
 
+    // テクニカル指標の計算
     let sma_vals = calculate_sma(&klines, period);
     let (u_vals, l_vals) = calculate_bollinger_bands(&klines, period, multiplier);
     let rsi_vals = calculate_rsi(&klines, 14);

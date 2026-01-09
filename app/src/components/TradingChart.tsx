@@ -31,7 +31,7 @@ interface KlineWithIndicator extends KlineData {
   stoch_d: number | null;
 }
 
-export const TradingChart = ({ symbol }: { symbol: string }) => {
+export const TradingChart = ({ symbol, exchange }: { symbol: string, exchange: string }) => {
   // Container Refs
   const mainRef = useRef<HTMLDivElement>(null);
   const rsiRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,7 @@ export const TradingChart = ({ symbol }: { symbol: string }) => {
 
   const fetchData = useCallback(async (p: number, m: number) => {
     try {
-      const data = await invoke<KlineWithIndicator[]>("fetch_candles", { symbol, period: p, multiplier: m });
+      const data = await invoke<KlineWithIndicator[]>("fetch_candles", { exchange_name: exchange, symbol, period: p, multiplier: m });
       // ... data parsing (omitted for brevity, same as before) ...
       // But need to reconstruct arrays
       const arrays = {
@@ -220,7 +220,7 @@ export const TradingChart = ({ symbol }: { symbol: string }) => {
       mainChart.current?.remove(); rsiChart.current?.remove(); macdChart.current?.remove(); stochChart.current?.remove();
       if (unlisten) unlisten();
     };
-  }, [symbol, fetchData, syncCharts]);
+  }, [symbol, exchange, fetchData, syncCharts]);
 
   return (
     <div className="bg-[#111620] rounded-lg border border-white/5 overflow-hidden flex flex-col h-full shadow-lg group hover:border-white/10 transition-colors">

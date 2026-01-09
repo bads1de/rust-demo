@@ -27,11 +27,12 @@ use tauri::State;
 #[tauri::command]
 async fn fetch_candles(
     state: State<'_, AppState>,
+    exchange_name: String,
     symbol: String,
     period: usize,
     multiplier: f64,
 ) -> Result<Vec<KlineWithIndicator>, String> {
-    lib_fetch_candles(state, symbol, period, multiplier).await
+    lib_fetch_candles(state, exchange_name, symbol, period, multiplier).await
 }
 
 /// アプリケーションのエントリーポイント
