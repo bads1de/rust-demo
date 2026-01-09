@@ -2,7 +2,7 @@ use tauri::State;
 use crate::models::{KlineData, KlineWithIndicator};
 use crate::indicators::{calculate_sma, calculate_bollinger_bands, calculate_rsi, calculate_macd, calculate_stoch};
 use crate::state::AppState;
-use crate::exchanges::{Exchange, binance::Binance, bybit::Bybit, bitget::Bitget, okx::Okx, kucoin::KuCoin, kraken::Kraken};
+use crate::exchanges::{Exchange, binance::Binance, bybit::Bybit, bitget::Bitget, okx::Okx, kucoin::KuCoin, kraken::Kraken, gate::Gate, mexc::Mexc};
 
 /// 指定された名前の取引所インスタンス（トレイトオブジェクト）を生成します。
 /// 
@@ -14,6 +14,8 @@ fn get_exchange_impl(name: &str) -> Box<dyn Exchange> {
         "okx" => Box::new(Okx::new()),
         "kucoin" => Box::new(KuCoin::new()),
         "kraken" => Box::new(Kraken::new()),
+        "gate" => Box::new(Gate::new()),
+        "mexc" => Box::new(Mexc::new()),
         _ => Box::new(Binance::new()), // デフォルトはBinance
     }
 }
@@ -56,7 +58,7 @@ pub async fn fetch_candles(
     let interval = match exchange.id() {
         "bybit" => "1",
         "kraken" => "1",
-        _ => "1m", // Binance, Bitget, OKX, KuCoin(converted inside)
+        _ => "1m", // Binance, Bitget, OKX, KuCoin, Gate, Mexc
     };
 
     // 4. 生データの取得

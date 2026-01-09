@@ -23,18 +23,21 @@ function App() {
   const [sortBy, setSortBy] = useState<"symbol" | "rsi" | "change">("symbol");
   const [sortOrder, setSortByOrder] = useState<"asc" | "desc">("asc");
 
-  // 取引所が変更されたら、デフォルトのシンボル形式に合わせる
-  useEffect(() => {
-    if (selectedExchange === "okx") {
+  // 取引所変更時のハンドラー
+  const handleExchangeChange = (exchange: string) => {
+    setSelectedExchange(exchange);
+
+    // 取引所に応じたデフォルトシンボルを設定
+    if (exchange === "okx" || exchange === "kucoin") {
       setSelectedSymbol("BTC-USDT");
-    } else if (selectedExchange === "kucoin") {
-      setSelectedSymbol("BTC-USDT");
-    } else if (selectedExchange === "kraken") {
+    } else if (exchange === "kraken") {
       setSelectedSymbol("XBTUSDT");
+    } else if (exchange === "gate") {
+      setSelectedSymbol("BTC_USDT");
     } else {
-      setSelectedSymbol("BTCUSDT");
+      setSelectedSymbol("BTCUSDT"); // Binance, Bybit, Mexc, Bitget
     }
-  }, [selectedExchange]);
+  };
 
   // WebSocketイベントの監視 (全銘柄)
   useEffect(() => {
@@ -107,10 +110,10 @@ function App() {
           <p className="text-xs font-mono text-gray-500">
             MONITORING {Object.keys(marketData).length} SYMBOLS
           </p>
-          
-          <div className="ml-4 flex items-center bg-[#0B0E14] rounded-lg p-1 border border-white/5">
+
+          <div className="ml-4 flex items-center bg-[#0B0E14] rounded-lg p-1 border border-white/5 space-x-1">
             <button
-              onClick={() => setSelectedExchange("binance")}
+              onClick={() => handleExchangeChange("binance")}
               className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
                 selectedExchange === "binance"
                   ? "bg-indigo-500 text-white"
@@ -120,7 +123,7 @@ function App() {
               BINANCE
             </button>
             <button
-              onClick={() => setSelectedExchange("bybit")}
+              onClick={() => handleExchangeChange("bybit")}
               className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
                 selectedExchange === "bybit"
                   ? "bg-orange-500 text-white"
@@ -130,7 +133,7 @@ function App() {
               BYBIT
             </button>
             <button
-              onClick={() => setSelectedExchange("bitget")}
+              onClick={() => handleExchangeChange("bitget")}
               className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
                 selectedExchange === "bitget"
                   ? "bg-cyan-500 text-white"
@@ -140,7 +143,7 @@ function App() {
               BITGET
             </button>
             <button
-              onClick={() => setSelectedExchange("okx")}
+              onClick={() => handleExchangeChange("okx")}
               className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
                 selectedExchange === "okx"
                   ? "bg-white text-black"
@@ -150,7 +153,7 @@ function App() {
               OKX
             </button>
             <button
-              onClick={() => setSelectedExchange("kucoin")}
+              onClick={() => handleExchangeChange("kucoin")}
               className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
                 selectedExchange === "kucoin"
                   ? "bg-teal-500 text-white"
@@ -160,7 +163,7 @@ function App() {
               KUCOIN
             </button>
             <button
-              onClick={() => setSelectedExchange("kraken")}
+              onClick={() => handleExchangeChange("kraken")}
               className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
                 selectedExchange === "kraken"
                   ? "bg-purple-500 text-white"
@@ -168,6 +171,26 @@ function App() {
               }`}
             >
               KRAKEN
+            </button>
+            <button
+              onClick={() => handleExchangeChange("gate")}
+              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
+                selectedExchange === "gate"
+                  ? "bg-red-500 text-white"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              GATE
+            </button>
+            <button
+              onClick={() => handleExchangeChange("mexc")}
+              className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
+                selectedExchange === "mexc"
+                  ? "bg-blue-500 text-white"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              MEXC
             </button>
           </div>
         </div>
@@ -259,10 +282,10 @@ function App() {
         {/* Right Content: Detailed Chart */}
         <main className="flex-1 p-6 bg-[#0B0E14] overflow-y-auto">
           <div className="h-full max-w-6xl mx-auto">
-            <TradingChart 
-              symbol={selectedSymbol} 
-              exchange={selectedExchange} 
-              key={`${selectedExchange}-${selectedSymbol}`} 
+            <TradingChart
+              symbol={selectedSymbol}
+              exchange={selectedExchange}
+              key={`${selectedExchange}-${selectedSymbol}`}
             />
           </div>
         </main>

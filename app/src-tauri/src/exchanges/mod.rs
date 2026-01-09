@@ -45,3 +45,9 @@ pub mod okx;
 pub mod kucoin;
 
 pub mod kraken;
+
+pub mod gate;
+
+pub mod mexc;
+
+
