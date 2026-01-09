@@ -51,7 +51,7 @@ fn main() {
             // WebSocketリスナーをバックグラウンドタスク（別スレッド）として起動します。
             // `tauri::async_runtime::spawn` はTokioの軽量スレッドを使用するため、
             // UIスレッドをブロックすることなくネットワーク待機が可能です。
-            tauri::async_runtime::spawn(start_websocket_listener(app_handle));
+            tauri::async_runtime::spawn(start_websocket_listener(app_handle, "binance".to_string()));
             
             Ok(())
         })

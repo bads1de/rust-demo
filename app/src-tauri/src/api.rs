@@ -7,7 +7,7 @@ use crate::exchanges::{Exchange, binance::Binance, bybit::Bybit, bitget::Bitget,
 /// 指定された名前の取引所インスタンス（トレイトオブジェクト）を生成します。
 /// 
 /// 実行時に動的に型を決定するため `Box<dyn Exchange>` を返します。
-fn get_exchange_impl(name: &str) -> Box<dyn Exchange> {
+pub fn get_exchange_impl(name: &str) -> Box<dyn Exchange> {
     match name.to_lowercase().as_str() {
         "bybit" => Box::new(Bybit::new()),
         "bitget" => Box::new(Bitget::new()),

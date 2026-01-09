@@ -101,6 +101,60 @@ impl Exchange for Bitget {
 
         Ok(klines)
     }
+
+    fn websocket_url(&self) -> &str {
+        "wss://ws.bitget.com/v2/ws/public"
+    }
+
+    fn websocket_subscription_payload(&self, symbols: &[String]) -> Result<String> {
+        let args: Vec<Value> = symbols.iter()
+            .map(|s| serde_json::json!({
+                "instType": "SPOT",
+                "channel": "candle1m",
+                "instId": s
+            }))
+            .collect();
+        
+        let payload = serde_json::json!({
+            "op": "subscribe",
+            "args": args
+        });
+        
+        Ok(payload.to_string())
+    }
+
+    fn parse_websocket_message(&self, msg: &str) -> Result<Option<(String, KlineData)>> {
+        if msg == "pong" { return Ok(None); }
+
+        let json: Value = serde_json::from_str(msg)?;
+
+        // Bitget response: { "action": "update", "arg": { "instId": "BTCUSDT", ... }, "data": [[ts, o, h, l, c, v], ...] }
+        if let Some(arg) = json["arg"].as_object() {
+            if let Some(symbol) = arg.get("instId").and_then(|v| v.as_str()) {
+                if let Some(data_list) = json["data"].as_array() {
+                    if let Some(row) = data_list.first().and_then(|d| d.as_array()) {
+                        if let (Some(t), Some(o), Some(h), Some(l), Some(c), Some(v)) = (
+                            row.get(0), row.get(1), row.get(2), row.get(3), row.get(4), row.get(5)
+                        ) {
+                            // Timestamp is string ms
+                            let time = t.as_str().unwrap_or("0").parse::<i64>().unwrap_or(0);
+                            
+                            return Ok(Some((symbol.to_string(), KlineData {
+                                time,
+                                open: o.as_str().unwrap_or("0").parse().unwrap_or(0.0),
+                                high: h.as_str().unwrap_or("0").parse().unwrap_or(0.0),
+                                low: l.as_str().unwrap_or("0").parse().unwrap_or(0.0),
+                                close: c.as_str().unwrap_or("0").parse().unwrap_or(0.0),
+                                volume: v.as_str().unwrap_or("0").parse().unwrap_or(0.0),
+                            })));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -112,7 +166,20 @@ mod tests {
         let bitget = Bitget::new();
         let result = bitget.fetch_candles("BTCUSDT", "1min").await;
         assert!(result.is_ok(), "Bitget API call failed");
-        let candles = result.unwrap();
-        assert!(!candles.is_empty(), "Should return candle data");
-    }
-}
+                let candles = result.unwrap();
+                assert!(!candles.is_empty(), "Should return candle data");
+            }
+        
+            #[test]
+            fn test_bitget_parse_websocket() {
+                let bitget = Bitget::new();
+                let msg = r#"{"action":"update","arg":{"instType":"SPOT","channel":"candle1m","instId":"BTCUSDT"},"data":[["1672531200000","16500.5","16502.0","16500.0","16501.0","10.5"]],"ts":1672531201000}"#;
+                
+                let result = bitget.parse_websocket_message(msg).unwrap();
+                assert!(result.is_some());
+                let (symbol, kline) = result.unwrap();
+                assert_eq!(symbol, "BTCUSDT");
+                assert_eq!(kline.close, 16501.0);
+            }
+        }
+        

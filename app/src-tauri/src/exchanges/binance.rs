@@ -21,14 +21,20 @@ impl Binance {
     }
 }
 
+use crate::models::CombinedStreamPayload;
+
+// ... existing code ...
+
 #[async_trait]
 impl Exchange for Binance {
+    // ... existing id, get_symbols, fetch_candles ...
+
     fn id(&self) -> &str {
         "binance"
     }
 
-    /// Binance Exchange Info APIを使用して、取引可能なUSDTペアを取得します。
     async fn get_symbols(&self) -> Result<Vec<String>> {
+        // ... (省略: 既存コードをそのまま残す) ...
         let res = self.client
             .get("https://api.binance.com/api/v3/exchangeInfo")
             .send()
@@ -42,7 +48,6 @@ impl Exchange for Binance {
             .ok_or_else(|| anyhow::anyhow!("Invalid Binance exchange info format"))?
             .iter()
             .filter(|s| {
-                // USDT建てかつ、現在取引可能なもののみを抽出
                 let is_usdt = s["quoteAsset"].as_str() == Some("USDT");
                 let is_trading = s["status"].as_str() == Some("TRADING");
                 is_usdt && is_trading
@@ -53,8 +58,8 @@ impl Exchange for Binance {
         Ok(symbols)
     }
 
-    /// Binance Kline APIを使用してローソク足データを取得します。
     async fn fetch_candles(&self, symbol: &str, interval: &str) -> Result<Vec<KlineData>> {
+        // ... (省略: 既存コードをそのまま残す) ...
         let res = self.client
             .get("https://api.binance.com/api/v3/klines")
             .query(&[
@@ -70,7 +75,6 @@ impl Exchange for Binance {
             return Err(anyhow::anyhow!("Binance API Error: {}", res.status()));
         }
 
-        // [[ts, o, h, l, c, v, ...], ...] という形式の配列の配列
         let rows: Vec<Vec<Value>> = res.json().await.context("Failed to parse Binance kline JSON")?;
         let mut klines = Vec::with_capacity(rows.len());
 
@@ -90,6 +94,35 @@ impl Exchange for Binance {
         }
 
         Ok(klines)
+    }
+
+    fn websocket_url(&self) -> &str {
+        "wss://stream.binance.com:9443/stream"
+    }
+
+    fn websocket_subscription_payload(&self, symbols: &[String]) -> Result<String> {
+        let params: Vec<String> = symbols.iter()
+            .map(|s| format!("{}@kline_1m", s.to_lowercase()))
+            .collect();
+        
+        let payload = serde_json::json!({
+            "method": "SUBSCRIBE",
+            "params": params,
+            "id": 1
+        });
+        
+        Ok(payload.to_string())
+    }
+
+    fn parse_websocket_message(&self, msg: &str) -> Result<Option<(String, KlineData)>> {
+        // Pingなどの制御メッセージは無視
+        if !msg.contains(r#""k""#) {
+            return Ok(None);
+        }
+
+        // Combined Stream format: {"stream":"...", "data": {"e":"kline", "s":"BTCUSDT", "k":{...}}}
+        let parsed: CombinedStreamPayload = serde_json::from_str(msg)?;
+        Ok(Some((parsed.data.symbol, parsed.data.kline)))
     }
 }
 

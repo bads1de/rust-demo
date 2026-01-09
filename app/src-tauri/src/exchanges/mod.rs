@@ -32,6 +32,19 @@ pub trait Exchange: Send + Sync {
     /// # Returns
     /// `KlineData` のベクタ。原則として、古いデータから新しいデータの順（昇順）で返されます。
     async fn fetch_candles(&self, symbol: &str, interval: &str) -> Result<Vec<KlineData>>;
+
+    // --- WebSocket Methods ---
+
+    /// WebSocketのエンドポイントURLを返します。
+    fn websocket_url(&self) -> &str;
+
+    /// 指定されたシンボルの購読メッセージ（JSON文字列）を作成します。
+    fn websocket_subscription_payload(&self, symbols: &[String]) -> Result<String>;
+
+    /// WebSocketから受信したメッセージをパースして、ローソク足データがあれば返します。
+    /// Pingメッセージや無関係なメッセージの場合は Ok(None) を返します。
+    /// 戻り値: (シンボル名, KlineData)
+    fn parse_websocket_message(&self, msg: &str) -> Result<Option<(String, KlineData)>>;
 }
 
 pub mod binance;

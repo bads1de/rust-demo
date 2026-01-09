@@ -53,6 +53,7 @@ impl Exchange for Bybit {
 
     /// Bybit V5 Kline APIを使用してデータを取得します。
     async fn fetch_candles(&self, symbol: &str, interval: &str) -> Result<Vec<KlineData>> {
+        // ... (existing code omitted) ...
         let res = self.client
             .get("https://api.bybit.com/v5/market/kline")
             .query(&[
@@ -98,6 +99,58 @@ impl Exchange for Bybit {
 
         Ok(klines)
     }
+
+    fn websocket_url(&self) -> &str {
+        "wss://stream.bybit.com/v5/public/spot"
+    }
+
+    fn websocket_subscription_payload(&self, symbols: &[String]) -> Result<String> {
+        let args: Vec<String> = symbols.iter()
+            .map(|s| format!("kline.1.{}", s))
+            .collect();
+        
+        let payload = serde_json::json!({
+            "op": "subscribe",
+            "args": args
+        });
+        
+        Ok(payload.to_string())
+    }
+
+    fn parse_websocket_message(&self, msg: &str) -> Result<Option<(String, KlineData)>> {
+        // Ping/Pong等は無視 (Bybitはop: pingを送る必要があるが、今回は受信解析のみ)
+        // データメッセージ: {"topic": "kline.1.BTCUSDT", "data": [...]}
+        let json: Value = serde_json::from_str(msg)?;
+
+        if let Some(topic) = json["topic"].as_str() {
+            if topic.starts_with("kline.1.") {
+                let symbol = topic.replace("kline.1.", "");
+                
+                if let Some(data_list) = json["data"].as_array() {
+                    if let Some(data) = data_list.first() {
+                        // Bybit WS fields: start, open, high, low, close, volume, turnover
+                        let t = data["start"].as_i64().unwrap_or(0); // WS returns timestamp as number (long)
+                        let o = data["open"].as_str().unwrap_or("0").parse().unwrap_or(0.0);
+                        let h = data["high"].as_str().unwrap_or("0").parse().unwrap_or(0.0);
+                        let l = data["low"].as_str().unwrap_or("0").parse().unwrap_or(0.0);
+                        let c = data["close"].as_str().unwrap_or("0").parse().unwrap_or(0.0);
+                        let v = data["volume"].as_str().unwrap_or("0").parse().unwrap_or(0.0);
+
+                        return Ok(Some((symbol, KlineData {
+                            time: t,
+                            open: o,
+                            high: h,
+                            low: l,
+                            close: c,
+                            volume: v,
+                        })));
+                    }
+                }
+            }
+        }
+        
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -110,7 +163,20 @@ mod tests {
         // Bybit V5 API: interval "1" は 1分足を指す
         let result = bybit.fetch_candles("BTCUSDT", "1").await;
         assert!(result.is_ok(), "Bybit API call failed");
-        let candles = result.unwrap();
-        assert!(!candles.is_empty(), "Should return candle data");
-    }
-}
+                let candles = result.unwrap();
+                assert!(!candles.is_empty(), "Should return candle data");
+            }
+        
+            #[test]
+            fn test_bybit_parse_websocket() {
+                let bybit = Bybit::new();
+                let msg = r#"{"topic":"kline.1.BTCUSDT","data":[{"start":1672531200000,"end":1672531260000,"interval":"1","open":"16500.5","close":"16501.0","high":"16502.0","low":"16500.0","volume":"10.5","turnover":"173260.5","confirm":false,"timestamp":1672531201000}],"ts":1672531201000,"type":"snapshot"}"#;
+                
+                let result = bybit.parse_websocket_message(msg).unwrap();
+                assert!(result.is_some());
+                let (symbol, kline) = result.unwrap();
+                assert_eq!(symbol, "BTCUSDT");
+                assert_eq!(kline.close, 16501.0);
+            }
+        }
+        

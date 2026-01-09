@@ -106,6 +106,10 @@ impl Exchange for KuCoin {
 
         Ok(klines)
     }
+
+    fn websocket_url(&self) -> &str { unimplemented!() }
+    fn websocket_subscription_payload(&self, _symbols: &[String]) -> Result<String> { unimplemented!() }
+    fn parse_websocket_message(&self, _msg: &str) -> Result<Option<(String, KlineData)>> { unimplemented!() }
 }
 
 #[cfg(test)]
