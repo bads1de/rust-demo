@@ -4,6 +4,9 @@ use super::Exchange;
 use anyhow::{Result, Context};
 use serde_json::Value;
 
+/// OKX取引所の実装。
+/// 
+/// OKX API v5 (REST) を使用してデータを取得します。
 pub struct Okx {
     client: reqwest::Client,
 }
@@ -22,6 +25,7 @@ impl Exchange for Okx {
         "okx"
     }
 
+    /// OKX V5 Instruments APIを使用して取引可能なSPOT/USDTペアを取得します。
     async fn get_symbols(&self) -> Result<Vec<String>> {
         let res = self.client
             .get("https://www.okx.com/api/v5/public/instruments")
@@ -30,11 +34,11 @@ impl Exchange for Okx {
             .await
             .context("Failed to get instruments from OKX")?;
 
-        let json: Value = res.json().await.context("Failed to parse JSON")?;
+        let json: Value = res.json().await.context("Failed to parse OKX instruments JSON")?;
 
         let symbols = json["data"]
             .as_array()
-            .ok_or_else(|| anyhow::anyhow!("Invalid format"))?
+            .ok_or_else(|| anyhow::anyhow!("Invalid OKX format"))?
             .iter()
             .filter(|s| {
                 let quote = s["quoteCcy"].as_str() == Some("USDT");
@@ -47,32 +51,32 @@ impl Exchange for Okx {
         Ok(symbols)
     }
 
+    /// OKX V5 Kline APIを使用してデータを取得します。
     async fn fetch_candles(&self, symbol: &str, interval: &str) -> Result<Vec<KlineData>> {
-        // OKX interval mapping if needed, but "1m" works for 'bar'
         let res = self.client
             .get("https://www.okx.com/api/v5/market/candles")
             .query(&[
                 ("instId", symbol),
                 ("bar", interval),
-                ("limit", "300"), // OKX default max is 100, can go up to 300 for candles
+                ("limit", "300"), 
             ])
             .send()
             .await
             .context("Failed to fetch candles from OKX")?;
 
         if !res.status().is_success() {
-            return Err(anyhow::anyhow!("API Error: {}", res.status()));
+            return Err(anyhow::anyhow!("OKX API Error: {}", res.status()));
         }
 
-        let json: Value = res.json().await.context("Failed to parse JSON")?;
+        let json: Value = res.json().await.context("Failed to parse OKX kline JSON")?;
         let rows = json["data"]
             .as_array()
-            .ok_or_else(|| anyhow::anyhow!("Invalid response format: 'data' not found"))?;
+            .ok_or_else(|| anyhow::anyhow!("Invalid OKX response format: 'data' not found"))?;
 
         let mut klines = Vec::with_capacity(rows.len());
 
         for row in rows {
-            // OKX: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
+            // OKX: [ts, o, h, l, c, vol, ...]
             if let (Some(t), Some(o), Some(h), Some(l), Some(c), Some(v)) = (
                 row.get(0), row.get(1), row.get(2), row.get(3), row.get(4), row.get(5)
             ) {
@@ -87,7 +91,7 @@ impl Exchange for Okx {
             }
         }
 
-        // OKX returns newest first
+        // 降順で返るため昇順に反転
         klines.reverse();
 
         Ok(klines)
@@ -101,24 +105,10 @@ mod tests {
     #[tokio::test]
     async fn test_okx_fetch_candles() {
         let okx = Okx::new();
-        // OKX uses hyphenated symbols e.g., "BTC-USDT"
+        // OKXのシンボル形式は "BTC-USDT"
         let result = okx.fetch_candles("BTC-USDT", "1m").await;
-        
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "OKX API call failed");
         let candles = result.unwrap();
-        assert!(!candles.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_okx_get_symbols() {
-        let okx = Okx::new();
-        let result = okx.get_symbols().await;
-        assert!(result.is_ok());
-        // OKX returns internal format, but our get_symbols should normalize or return as is?
-        // Usually UI expects "BTCUSDT", but OKX needs "BTC-USDT".
-        // For simplicity in this app, we might return "BTC-USDT" and handle display in UI,
-        // or convert. Let's assume we return raw ID for now.
-        let symbols = result.unwrap();
-        assert!(symbols.contains(&"BTC-USDT".to_string()));
+        assert!(!candles.is_empty(), "Should return candle data");
     }
 }

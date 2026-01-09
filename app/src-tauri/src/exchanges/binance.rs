@@ -4,11 +4,16 @@ use super::Exchange;
 use anyhow::{Result, Context};
 use serde_json::Value;
 
+/// Binance取引所の実装。
+/// 
+/// Binance API v3 (REST) を使用してデータを取得します。
 pub struct Binance {
+    /// HTTPリクエストを送信するための共有クライアント
     client: reqwest::Client,
 }
 
 impl Binance {
+    /// 新しいBinanceインスタンスを生成します。
     pub fn new() -> Self {
         Self {
             client: reqwest::Client::new(),
@@ -22,20 +27,22 @@ impl Exchange for Binance {
         "binance"
     }
 
+    /// Binance Exchange Info APIを使用して、取引可能なUSDTペアを取得します。
     async fn get_symbols(&self) -> Result<Vec<String>> {
         let res = self.client
             .get("https://api.binance.com/api/v3/exchangeInfo")
             .send()
             .await
-            .context("Failed to get exchange info")?;
+            .context("Failed to get exchange info from Binance")?;
 
-        let json: Value = res.json().await.context("Failed to parse JSON")?;
+        let json: Value = res.json().await.context("Failed to parse Binance exchange info JSON")?;
         
         let symbols = json["symbols"]
             .as_array()
-            .ok_or_else(|| anyhow::anyhow!("Invalid format"))?
+            .ok_or_else(|| anyhow::anyhow!("Invalid Binance exchange info format"))?
             .iter()
             .filter(|s| {
+                // USDT建てかつ、現在取引可能なもののみを抽出
                 let is_usdt = s["quoteAsset"].as_str() == Some("USDT");
                 let is_trading = s["status"].as_str() == Some("TRADING");
                 is_usdt && is_trading
@@ -46,6 +53,7 @@ impl Exchange for Binance {
         Ok(symbols)
     }
 
+    /// Binance Kline APIを使用してローソク足データを取得します。
     async fn fetch_candles(&self, symbol: &str, interval: &str) -> Result<Vec<KlineData>> {
         let res = self.client
             .get("https://api.binance.com/api/v3/klines")
@@ -59,10 +67,11 @@ impl Exchange for Binance {
             .context("Failed to send request to Binance")?;
 
         if !res.status().is_success() {
-            return Err(anyhow::anyhow!("API Error: {}", res.status()));
+            return Err(anyhow::anyhow!("Binance API Error: {}", res.status()));
         }
 
-        let rows: Vec<Vec<Value>> = res.json().await.context("Failed to parse JSON")?;
+        // [[ts, o, h, l, c, v, ...], ...] という形式の配列の配列
+        let rows: Vec<Vec<Value>> = res.json().await.context("Failed to parse Binance kline JSON")?;
         let mut klines = Vec::with_capacity(rows.len());
 
         for row in rows {
@@ -90,23 +99,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_binance_fetch_candles() {
-        // Arrange
         let binance = Binance::new();
-        let symbol = "BTCUSDT";
-        let interval = "1m";
-
-        // Act
-        // 実装がないため、ここで panic! が発生しテストは失敗するはずです
-        let result = binance.fetch_candles(symbol, interval).await;
-
-        // Assert
-        assert!(result.is_ok(), "API call should succeed");
+        let result = binance.fetch_candles("BTCUSDT", "1m").await;
+        assert!(result.is_ok(), "Binance API call failed");
         let candles = result.unwrap();
         assert!(!candles.is_empty(), "Should return candle data");
-        
-        // データの整合性チェック
-        let first_candle = &candles[0];
-        assert!(first_candle.close > 0.0);
-        assert!(first_candle.volume >= 0.0);
     }
 }

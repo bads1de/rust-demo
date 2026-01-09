@@ -4,23 +4,33 @@ use crate::indicators::{calculate_sma, calculate_bollinger_bands, calculate_rsi,
 use crate::state::AppState;
 use crate::exchanges::{Exchange, binance::Binance, bybit::Bybit, bitget::Bitget, okx::Okx};
 
-/// 取引所インスタンスを生成するヘルパー
+/// 指定された名前の取引所インスタンス（トレイトオブジェクト）を生成します。
+/// 
+/// 実行時に動的に型を決定するため `Box<dyn Exchange>` を返します。
 fn get_exchange_impl(name: &str) -> Box<dyn Exchange> {
     match name.to_lowercase().as_str() {
         "bybit" => Box::new(Bybit::new()),
         "bitget" => Box::new(Bitget::new()),
         "okx" => Box::new(Okx::new()),
-        _ => Box::new(Binance::new()), // Default to Binance
+        _ => Box::new(Binance::new()), // デフォルトはBinance
     }
 }
 
-/// 全USDT銘柄を取得する (デフォルトはBinanceだが、将来的には引数で指定可能にすべき)
+/// 全USDT銘柄を取得します。
+/// 現時点ではデフォルトの取引所（Binance）の銘柄リストを返します。
 pub async fn get_all_symbols() -> Result<Vec<String>, String> {
     let exchange = Binance::new();
     exchange.get_symbols().await.map_err(|e| e.to_string())
 }
 
-/// 過去のローソク足データを取得する
+/// フロントエンドからのリクエストを受け、指定された取引所からローソク足データを取得し、
+/// テクニカル指標を計算して返します。
+/// 
+/// # Arguments
+/// * `exchange_name` - 取引所名 ("binance", "bybit", etc.)
+/// * `symbol` - 通貨ペア名
+/// * `period` - 移動平均線などの計算期間
+/// * `multiplier` - ボリンジャーバンドの倍率
 #[tauri::command]
 pub async fn fetch_candles(
     state: State<'_, AppState>,
@@ -29,34 +39,39 @@ pub async fn fetch_candles(
     period: usize,
     multiplier: f64,
 ) -> Result<Vec<KlineWithIndicator>, String> {
+    // 1. 計算設定の更新
     {
         let mut config = state.config.lock().map_err(|_| "Failed to lock config".to_string())?;
         config.period = period;
         config.multiplier = multiplier;
     }
 
+    // 2. 取引所インスタンスの取得
     let exchange = get_exchange_impl(&exchange_name);
     
-    // Bybit等のインターバル形式変換が必要ならここでやる
-    // 今回は簡単のため "1m" (Binance/Bitget/OKX) と "1" (Bybit) の違いを吸収するロジックを入れる
+    // 3. 取引所ごとの時間足形式の調整
+    // 例: Binanceは "1m", Bybitは "1" を期待する
     let interval = match exchange.id() {
         "bybit" => "1",
         _ => "1m",
     };
 
+    // 4. 生データの取得
     let klines = exchange.fetch_candles(&symbol, interval).await
         .map_err(|e| e.to_string())?;
 
-    // 取得したデータを状態にキャッシュ
+    // 5. 状態管理（AppState）への保存
+    // リアルタイム更新の基準データとしてメモリ上に保持します
     state.klines.insert(symbol.clone(), klines.clone());
 
-    // テクニカル指標の計算
+    // 6. テクニカル指標の計算（taクレートと自作 indicators.rs を使用）
     let sma_vals = calculate_sma(&klines, period);
     let (u_vals, l_vals) = calculate_bollinger_bands(&klines, period, multiplier);
     let rsi_vals = calculate_rsi(&klines, 14);
     let (macd, signal, hist) = calculate_macd(&klines, 12, 26, 9);
     let (stoch_k, stoch_d) = calculate_stoch(&klines, 14, 3, 3);
 
+    // 7. データの統合と返却
     let combined = klines.into_iter().enumerate()
         .map(|(i, kline)| KlineWithIndicator {
             symbol: symbol.clone(),
