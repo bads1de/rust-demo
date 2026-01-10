@@ -26,3 +26,6 @@ pub mod state;
 
 /// 取引所ごとの実装を抽象化するモジュール
 pub mod exchanges;
+
+/// スキャナー機能（プリセットフィルタによる銘柄スクリーニング）
+pub mod scanner;

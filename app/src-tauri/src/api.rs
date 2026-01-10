@@ -95,3 +95,94 @@ pub async fn fetch_candles(
 
     Ok(combined)
 }
+
+/// スキャナープリセット一覧を取得します。
+#[tauri::command]
+pub fn get_scanner_presets() -> Vec<crate::scanner::ScannerPreset> {
+    crate::scanner::get_default_presets()
+}
+
+/// 指定されたプリセットで全銘柄をスキャンします。
+///
+/// # Arguments
+/// * `preset_id` - プリセットID (例: "rsi_overbought")
+/// * `exchange_name` - 取引所名 (例: "binance")
+/// * `interval` - 時間足 (例: "1h")
+#[tauri::command]
+pub async fn run_scanner(
+    preset_id: String,
+    exchange_name: String,
+    interval: String,
+) -> Result<Vec<crate::scanner::ScanResult>, String> {
+    use crate::scanner::{get_default_presets, ScanResult};
+    
+    // 1. プリセットを取得
+    let presets = get_default_presets();
+    let preset = presets.iter()
+        .find(|p| p.id == preset_id)
+        .ok_or_else(|| format!("Preset '{}' not found", preset_id))?;
+    
+    // 2. 取引所インスタンスの取得
+    let exchange = get_exchange_impl(&exchange_name);
+    
+    // 3. 取引所ごとの時間足形式の調整
+    let interval_str = match (exchange.id(), interval.as_str()) {
+        ("bybit", "1h") => "60",
+        ("bybit", "4h") => "240",
+        ("bybit", "1d") => "D",
+        ("kraken", "1h") => "60",
+        ("kraken", "4h") => "240",
+        ("kraken", "1d") => "1440",
+        (_, i) => i,
+    };
+    
+    // 4. 全シンボルを取得
+    let symbols = exchange.get_symbols().await.map_err(|e| e.to_string())?;
+    
+    // 5. 並列でデータ取得＆フィルタリング（最大100銘柄に制限）
+    let limited_symbols: Vec<_> = symbols.into_iter().take(100).collect();
+    let mut results = Vec::new();
+    
+    for symbol in limited_symbols {
+        // データ取得
+        let klines = match exchange.fetch_candles(&symbol, interval_str).await {
+            Ok(k) if k.len() >= 30 => k,
+            _ => continue, // データ不足はスキップ
+        };
+        
+        // テクニカル指標の計算
+        let sma_vals = calculate_sma(&klines, 20);
+        let (upper_vals, lower_vals) = calculate_bollinger_bands(&klines, 20, 2.0);
+        let rsi_vals = calculate_rsi(&klines, 14);
+        let (macd_vals, signal_vals, _) = calculate_macd(&klines, 12, 26, 9);
+        let (stoch_k_vals, stoch_d_vals) = calculate_stoch(&klines, 14, 3, 3);
+        
+        // 最新足のインデックス
+        let last = klines.len() - 1;
+        let prev = if last > 0 { last - 1 } else { 0 };
+        
+        // ScanResultを構築
+        let scan_result = ScanResult {
+            exchange: exchange_name.clone(),
+            symbol: symbol.clone(),
+            price: klines[last].close,
+            rsi: rsi_vals[last],
+            stoch_k: stoch_k_vals[last],
+            stoch_d: stoch_d_vals[last],
+            macd: macd_vals[last],
+            macd_signal: signal_vals[last],
+            sma: sma_vals[last],
+            upper_band: upper_vals[last],
+            lower_band: lower_vals[last],
+            prev_macd: macd_vals[prev],
+            prev_macd_signal: signal_vals[prev],
+        };
+        
+        // フィルタ条件をチェック
+        if scan_result.matches_preset(preset) {
+            results.push(scan_result);
+        }
+    }
+    
+    Ok(results)
+}

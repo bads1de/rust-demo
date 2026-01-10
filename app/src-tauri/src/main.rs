@@ -1,7 +1,12 @@
 // 必要なモジュールやクレートをインポートします。
 // `rust_chart_lib` は、私たちが作成したライブラリクレートの名前です。
-use rust_chart_lib::api::fetch_candles as lib_fetch_candles;
+use rust_chart_lib::api::{
+    fetch_candles as lib_fetch_candles,
+    get_scanner_presets as lib_get_scanner_presets,
+    run_scanner as lib_run_scanner,
+};
 use rust_chart_lib::models::KlineWithIndicator;
+use rust_chart_lib::scanner::{ScannerPreset, ScanResult};
 use rust_chart_lib::websocket::start_websocket_listener;
 use rust_chart_lib::state::AppState;
 use tauri::State;
@@ -35,6 +40,22 @@ async fn fetch_candles(
     lib_fetch_candles(state, exchange_name, symbol, period, multiplier).await
 }
 
+/// スキャナープリセット一覧を取得します。
+#[tauri::command]
+fn get_scanner_presets() -> Vec<ScannerPreset> {
+    lib_get_scanner_presets()
+}
+
+/// 指定されたプリセットで全銘柄をスキャンします。
+#[tauri::command]
+async fn run_scanner(
+    preset_id: String,
+    exchange_name: String,
+    interval: String,
+) -> Result<Vec<ScanResult>, String> {
+    lib_run_scanner(preset_id, exchange_name, interval).await
+}
+
 /// アプリケーションのエントリーポイント
 fn main() {
     // Tauriアプリケーションのビルドと実行を開始します
@@ -57,7 +78,11 @@ fn main() {
         })
         
         // フロントエンドから呼び出し可能なコマンドを登録します。
-        .invoke_handler(tauri::generate_handler![fetch_candles])
+        .invoke_handler(tauri::generate_handler![
+            fetch_candles,
+            get_scanner_presets,
+            run_scanner
+        ])
         
         // アプリケーションを実行します。
         // ここでコンテキスト（設定ファイルなど）を生成します。
